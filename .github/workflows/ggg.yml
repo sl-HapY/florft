@@ -1,0 +1,54 @@
+name: Download & Split Florence-2-base-ft Model
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write   # برای push کردن تغییرات به ریپازیتوری ضروری است.
+
+jobs:
+  split-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install huggingface_hub
+        run: pip install huggingface_hub
+
+      - name: Download Florence-2-base-ft model from florence-community
+        run: |
+          python -c "
+          from huggingface_hub import snapshot_download
+          snapshot_download(
+              'florence-community/Florence-2-base-ft',
+              local_dir='./florence_model',
+              local_dir_use_symlinks=False
+          )
+          "
+
+      - name: Install rar
+        run: sudo apt-get install -y rar
+
+      - name: Create split RARs inside a folder
+        run: |
+          mkdir -p florence_model_parts
+          rar a -v90M -m0 -ep1 florence_model_parts/model_parts.rar florence_model/
+
+      - name: Remove original downloaded folder
+        run: rm -rf florence_model/
+
+      - name: Commit and push to default branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add florence_model_parts/
+          git commit -m "Add Florence-2-base-ft model parts (90MB each)" || echo "No changes to commit"
+          git push
